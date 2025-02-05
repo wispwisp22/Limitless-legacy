@@ -1,0 +1,294 @@
+----- Take my source idrc tbh 
+
+-----------------------------------SOUND-----------------------------------------------------
+
+local function downloadSoundFile(sn, url)
+    if isfile(sn) then
+        local success, result =
+            pcall(
+            function()
+                return getcustomasset(sn)
+            end
+        )
+        if success then
+            return result
+        end
+        delfile(sn)
+    end
+
+    url = url:gsub("github.com", "raw.githubusercontent.com"):gsub("/blob/", "/")
+
+    local success, response =
+        pcall(
+        function()
+            return request(
+                {
+                    Url = url,
+                    Method = "GET"
+                }
+            )
+        end
+    )
+
+    if not success or not response or not response.Body then
+        warn("Failed to download: " .. sn)
+        return nil
+    end
+
+    local writeSuccess, writeError =
+        pcall(
+        function()
+            writefile(sn, response.Body)
+        end
+    )
+
+    if not writeSuccess then
+        warn("Failed to write file: " .. sn .. " Error: " .. tostring(writeError))
+        return nil
+    end
+
+    local assetSuccess, asset =
+        pcall(
+        function()
+            return getcustomasset(sn)
+        end
+    )
+
+    if not assetSuccess then
+        warn("Failed to load asset: " .. sn)
+        if isfile(sn) then
+            delfile(sn)
+        end
+        return nil
+    end
+
+    print("Successfully downloaded and loaded: " .. sn)
+    return asset
+end
+
+local soundFiles = {
+    {
+        name = "KOKUSEN.mp3",
+        url = "https://raw.githubusercontent.com/wispwisp22/sfx/blob/main/Yuji%20Black%20flash%20Sound%20effect%20japnese.mp3"
+    }
+}
+
+for _, sound in ipairs(soundFiles) do
+    local result = downloadSoundFile(sound.name, sound.url)
+    if not result then
+        warn("Failed to process sound file: " .. sound.name)
+    end
+end
+
+local animationData = {
+    ["10468665991"] = {
+        -- Move 1
+        newId = "rbxassetid://18896127525",
+        handler = function(humanoid, character, newTrack, variantTrack, cooldownActive)            
+            local kokusenSound = Instance.new("Sound")
+            kokusenSound.SoundId = getcustomasset("KOKUSEN.mp3")
+            kokusenSound.Volume = 3
+            kokusenSound.Parent = character:WaitForChild("Head")
+            kokusenSound.TimePosition = 0.7
+
+            kokusenSound:Play()
+            newTrack:Play()
+            newTrack.TimePosition = 0.7
+            newTrack:AdjustSpeed(1)
+
+task.wait(0.2)
+            local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local rightArm = character:FindFirstChild("HumanoidRootPart")
+
+local assetId = "rbxassetid://129852000273594"
+local model = game:GetObjects(assetId)[1]
+
+if model then
+    local primaryPart = model:IsA("Model") and model.PrimaryPart or model
+    
+    if not primaryPart then
+        primaryPart = model:FindFirstChild("Handle") or model:FindFirstChildWhichIsA("BasePart")
+    end
+    
+    if primaryPart then
+        model.Parent = workspace
+
+        primaryPart.CFrame = rightArm.CFrame * CFrame.new(0, 0, -5)
+        local weld = Instance.new("Weld")
+        weld.Part0 = rightArm
+        weld.Part1 = primaryPart
+        weld.C0 = CFrame.new(0, 0, -5) * CFrame.Angles(math.rad(0), math.rad(0), math.rad(0))
+        weld.Parent = rightArm
+
+        for _, vfx in pairs(model:GetDescendants()) do
+            if vfx:IsA("ParticleEmitter") then
+                vfx.Enabled = true
+                vfx.Rate = 10
+                vfx:Emit(10)
+
+
+				task.wait(0.5)
+
+                for _, vfx in pairs(model:GetDescendants()) do
+                    if vfx:IsA("ParticleEmitter") then
+                        vfx.Enabled = false
+                    end
+
+                end
+
+                task.wait(2)
+
+				model:Destroy()
+            end
+        end
+    else
+        warn("No suitable part")
+    end
+end
+
+
+            
+        end
+    }
+}
+
+local tracks = {}
+local cooldownActive = false
+
+local animationConnections = {} 
+
+local function cleanupExistingConnections()
+    for _, connection in pairs(animationConnections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    table.clear(animationConnections)
+    table.clear(tracks)
+end
+
+local function setupTracks()
+    cleanupExistingConnections()
+
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    if not character then
+        character = player.CharacterAdded:Wait()
+    end
+
+    local humanoid = character:WaitForChild("Humanoid", 10)
+    if not humanoid then
+        warn("Failed to find Humanoid")
+        return
+    end
+
+    for oldId, data in pairs(animationData) do
+        local success, newTrack = pcall(function()
+            local newAnim = Instance.new("Animation")
+            newAnim.AnimationId = data.newId
+            return humanoid:LoadAnimation(newAnim)
+        end)
+
+        if success then
+            tracks[oldId] = {
+                main = newTrack,
+                isPlaying = false,
+                lastPlayTime = 0
+            }
+            tracks[oldId].main.Priority = Enum.AnimationPriority.Action
+
+            tracks[oldId].main.Stopped:Connect(function()
+                tracks[oldId].isPlaying = false
+            end)
+
+            if data.variantId then
+                local variantSuccess, variantTrack = pcall(function()
+                    local variantAnim = Instance.new("Animation")
+                    variantAnim.AnimationId = data.variantId
+                    return humanoid:LoadAnimation(variantAnim)
+                end)
+
+                if variantSuccess then
+                    tracks[oldId].variant = variantTrack
+                    tracks[oldId].variant.Priority = Enum.AnimationPriority.Action
+                    
+                    tracks[oldId].variant.Stopped:Connect(function()
+                        tracks[oldId].isPlaying = false
+                    end)
+                end
+            end
+
+            if data.standingId then
+                local standingSuccess, standingTrack = pcall(function()
+                    local standingAnim = Instance.new("Animation")
+                    standingAnim.AnimationId = data.standingId
+                    return humanoid:LoadAnimation(standingAnim)
+                end)
+
+                if standingSuccess then
+                    tracks[oldId].variant = standingTrack
+                    tracks[oldId].variant.Priority = Enum.AnimationPriority.Action
+                    
+                    tracks[oldId].variant.Stopped:Connect(function()
+                        tracks[oldId].isPlaying = false
+                    end)
+                end
+            end
+        else
+            warn("Failed to load animation for ID:", oldId)
+        end
+    end
+
+    if humanoid then
+        local connection = humanoid.AnimationPlayed:Connect(function(animTrack)
+            if not animTrack or not animTrack.Animation then
+                return
+            end
+
+            if animTrack.IsPlaying then
+                local animId = animTrack.Animation.AnimationId:match("%d+")
+                local data = animationData[animId]
+
+                if data then
+                    local currentTime = tick()
+                    if tracks[animId].isPlaying or (currentTime - tracks[animId].lastPlayTime) < 0.5 then
+                        return
+                    end
+
+                    tracks[animId].isPlaying = true
+                    tracks[animId].lastPlayTime = currentTime
+
+                    animTrack:Stop()
+
+                    if data.cooldown and cooldownActive then
+                        return
+                    end
+
+                    if data.cooldown then
+                        cooldownActive = true
+                        data.handler(humanoid, character, tracks[animId].main, tracks[animId].variant)
+                        task.wait(data.cooldown)
+                        cooldownActive = false
+                    else
+                        data.handler(humanoid, character, tracks[animId].main, tracks[animId].variant, cooldownActive)
+                    end
+
+                    task.delay(2, function()
+                        tracks[animId].isPlaying = false
+                    end)
+                end
+            end
+        end)
+        table.insert(animationConnections, connection)
+    end
+end
+
+game.Players.LocalPlayer.CharacterAdded:Connect(setupTracks)
+if game.Players.LocalPlayer.Character then
+    setupTracks()
+end
